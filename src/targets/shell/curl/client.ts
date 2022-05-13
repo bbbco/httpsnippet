@@ -10,7 +10,7 @@
 
 import { CodeBuilder } from '../../../helpers/code-builder';
 import { getHeaderName } from '../../../helpers/headers';
-import { quote } from '../../../helpers/shell';
+import { quote, shellSafe } from '../../../helpers/shell';
 import { Client } from '../../targets';
 
 export interface CurlOptions {
@@ -85,6 +85,18 @@ export const curl: Client<CurlOptions> = {
       push(`${opts.short ? '-b' : '--cookie'} ${quote(allHeaders.cookie as string)}`);
     }
 
+    const formatForDataFlag = (value = '') => {
+      return `${
+        opts.binary
+          ? '--data-binary'
+          : !shellSafe(value)
+          ? '--data-urlencode'
+          : opts.short
+          ? '-d'
+          : '--data'
+      } ${quote(value)}`;
+    };
+
     // construct post params
     switch (postData.mimeType) {
       case 'multipart/form-data':
@@ -103,29 +115,17 @@ export const curl: Client<CurlOptions> = {
       case 'application/x-www-form-urlencoded':
         if (postData.params) {
           postData.params.forEach(param => {
-            push(
-              `${opts.binary ? '--data-binary' : opts.short ? '-d' : '--data'} ${quote(
-                `${param.name}=${param.value}`,
-              )}`,
-            );
+            push(formatForDataFlag(`${param.name}=${param.value}`));
           });
         } else {
-          push(
-            `${opts.binary ? '--data-binary' : opts.short ? '-d' : '--data'} ${quote(
-              postData.text,
-            )}`,
-          );
+          push(formatForDataFlag(postData.text));
         }
         break;
 
       default:
         // raw request body
         if (postData.text) {
-          push(
-            `${opts.binary ? '--data-binary' : opts.short ? '-d' : '--data'} ${quote(
-              postData.text,
-            )}`,
-          );
+          push(formatForDataFlag(postData.text));
         }
     }
 
